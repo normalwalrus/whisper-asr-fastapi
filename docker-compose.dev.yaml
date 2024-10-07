@@ -1,0 +1,65 @@
+services:
+
+  asr-service:
+    container_name: asr-service
+    image: dinohub-asr/whisper-asr-fastapi-service:0.1.0
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    env_file: .env.dev
+    stdin_open: true
+    tty: true
+    volumes:
+      - $PWD/asr_inference_service:/opt/app-root/asr_inference_service
+      - $PWD/pretrained_models/whisper-small:/opt/app-root/pretrained_models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - 8000:8080
+    command: ["fastapi", "dev", "asr_inference_service/main.py", "--host", "0.0.0.0", "--port", "8080"]
+
+
+  gradio-app:
+    stdin_open: true
+    tty: true
+    container_name: gradio-app
+    image: dinohub-asr/gradio-fastapi-service:0.1.0
+    build:
+        context: ./app
+        dockerfile: Dockerfile
+
+    volumes:
+      - $PWD/app:/opt/app-root/app
+    # environment:
+    #   - ASR_SERVICE=http://asr-service:8080
+
+    ports:
+      - 7860:7860
+    command: ["python3", "app/main.py"]
+
+  vad-service:
+    container_name: vad-service
+    image: dinohub-asr/vad-fastapi-service:0.1.0
+    build:
+      context: ./vad
+      dockerfile: Dockerfile
+    stdin_open: true
+    tty: true
+    volumes:
+      - $PWD/vad:/opt/app-root/vad
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    ports:
+      - 8001:8081
+    command: ["fastapi", "dev", "vad/main.py", "--host", "0.0.0.0", "--port", "8081"]
